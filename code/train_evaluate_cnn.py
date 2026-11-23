@@ -2,7 +2,7 @@ from pathlib import Path
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import torch
-from ConvNet import ConvNet
+from ConvNet import ConvNet3, ConvNet4
 
 def inspect_data_splits(train_dataset, test_dataset):
     print(f'Training images: {len(train_dataset)}')
