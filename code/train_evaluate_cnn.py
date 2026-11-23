@@ -1,6 +1,8 @@
 from pathlib import Path
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
+import torch
+from ConvNet import ConvNet
 
 def inspect_data_splits(train_dataset, test_dataset):
     print(f'Training images: {len(train_dataset)}')
@@ -54,7 +56,7 @@ def main():
         transform=transform
     )
 
-    inspect_data_splits(train_dataset, test_dataset)
+    # inspect_data_splits(train_dataset, test_dataset)
 
     # Create loader for each split
     batch_size = 128
@@ -69,12 +71,12 @@ def main():
     test_loader = DataLoader(
         dataset=test_dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=False,
         num_workers=0,
         drop_last=False
     )
 
-    inspect_data_batches(train_loader, test_loader)
+    # inspect_data_batches(train_loader, test_loader)
 
 
 if __name__ == '__main__':
