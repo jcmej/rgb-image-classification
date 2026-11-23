@@ -101,8 +101,8 @@ class ConvNet3(nn.Module):
 
 ''' Classify CIFAR-10 images using 4 convolutional layers '''
 class ConvNet4(nn.Module):
+    # Define model layers
     def __init__(self):
-        # Define model layers
         super(ConvNet4, self).__init__()
 
         # First convolution, 1 rgb image -> 32 feature maps
