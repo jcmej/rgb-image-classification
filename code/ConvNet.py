@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-''' Classify CIFAR-10 images using 3 convolutional layers '''
 class ConvNet3(nn.Module):
+    ''' Classify CIFAR-10 images using 3 convolutional layers '''
     # Define model layers
     def __init__(self):
         super(ConvNet3, self).__init__()
@@ -99,8 +99,8 @@ class ConvNet3(nn.Module):
         # 128 features -> 10 logits
         return self.fc_out(x)
 
-''' Classify CIFAR-10 images using 4 convolutional layers '''
 class ConvNet4(nn.Module):
+    ''' Classify CIFAR-10 images using 4 convolutional layers '''
     # Define model layers
     def __init__(self):
         super(ConvNet4, self).__init__()

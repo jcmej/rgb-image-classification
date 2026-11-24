@@ -3,6 +3,10 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import torch
 from ConvNet import ConvNet3, ConvNet4
+import time
+import matplotlib
+matplotlib.use ('Agg')
+import matplotlib.pyplot as plt
 
 def inspect_data_splits(train_dataset, test_dataset):
     print(f'Training images: {len(train_dataset)}')
@@ -24,8 +28,8 @@ def inspect_data_batches(train_loader, test_loader):
     print(f'Number of training batches: {len(train_loader)}')
     print(f'Number of testing batches: {len(test_loader)}')
 
-''' Train specified model and return sample-averaged loss and accuracy '''
 def train(model, device, train_loader, optimizer, criterion):
+    ''' Train specified model and return sample-averaged loss and accuracy '''
     # Configure model to train
     model.train()
 
@@ -65,8 +69,8 @@ def train(model, device, train_loader, optimizer, criterion):
 
     return epoch_loss, epoch_accuracy
 
-''' Evaluate specified model's weights and return average loss and accuracy '''
 def evaluate(model, device, test_loader, criterion):
+    ''' Evaluate specified model's weights and return average loss and accuracy '''
     # Configure model to evaluate
     model.eval()
     total_samples = 0
@@ -97,6 +101,142 @@ def evaluate(model, device, test_loader, criterion):
     epoch_accuracy = (total_correct / total_samples) * 100.0
 
     return epoch_loss, epoch_accuracy
+
+def report(message, output_path):
+    ''' Print a message and append it to a text results file '''
+    print(message, flush=True)
+    with output_path.open('a', encoding='utf-8') as output_file:
+        output_file.write(message + '\n')
+
+def train_model_spec(model, criterion, optimizer, device, train_loader, test_loader, num_epochs=30):
+    ''' Reusable training and evaluation loop '''
+    # Store results in a text file
+    model_name = type(model).__name__
+    results_dir = Path(__file__).resolve().parent.parent / 'results'
+    results_dir.mkdir(parents=True, exist_ok=True)
+    output_path = results_dir / f'{model_name}_results.txt'
+    # Begin new results file
+    output_path.write_text('', encoding='utf-8')
+
+    report(
+        f'Model: {model_name}\n'
+        f'Device: {device}\n'
+        f'Epochs: {num_epochs}\n'
+        f'Batch size: {train_loader.batch_size}\n'
+        f'Optimizer: {optimizer}\n'
+        f'Loss function: {criterion}',
+        output_path
+    )
+    
+    history = {
+        'train_loss': [],
+        'train_accuracy': [],
+        'test_loss': [],
+        'test_accuracy': [],
+    }
+
+    min_train_loss = float('inf')
+    min_test_loss = float('inf')
+    min_train_epoch = 0
+    min_test_epoch = 0
+
+    start_time = time.perf_counter()
+    for epoch in range(1, num_epochs + 1):
+        print(f'\nEpoch {epoch}/{num_epochs}', flush=True)
+
+        train_loss, train_accuracy = train(
+            model=model,
+            device=device,
+            train_loader=train_loader,
+            optimizer=optimizer,
+            criterion=criterion
+        )
+
+        test_loss, test_accuracy = evaluate(
+            model=model,
+            device=device,
+            test_loader=test_loader,
+            criterion=criterion
+        )
+
+        history['train_loss'].append(train_loss)
+        history['train_accuracy'].append(train_accuracy)
+        history['test_loss'].append(test_loss)
+        history['test_accuracy'].append(test_accuracy)
+
+        # Track minimum losses
+        if train_loss < min_train_loss:
+            min_train_loss = train_loss
+            min_train_epoch = epoch
+
+        if test_loss < min_test_loss:
+            min_test_loss = test_loss
+            min_test_epoch = epoch
+
+        report(
+            f'\nEpoch {epoch}/{num_epochs}\n'
+            f'Training loss: {train_loss:.6f}\n'
+            f'Training accuracy: {train_accuracy:.2f}%\n'
+            f'Testing loss: {test_loss:.6f}\n'
+            f'Testing accuracy: {test_accuracy:.2f}%',
+            output_path
+        )
+
+    total_seconds = time.perf_counter() - start_time
+    final_train_accuracy = history['train_accuracy'][-1]
+    final_test_accuracy = history['test_accuracy'][-1]
+
+    report(
+        f'\nResults after {num_epochs} epochs\n'
+        f'Total training/evaluation time: {total_seconds / 60:.2f} minutes\n'
+        f'Training accuracy: {final_train_accuracy:.2f}%\n'
+        f'Test accuracy: {final_test_accuracy:.2f}%\n'
+        f'Lowest training loss: {min_train_loss:.6f} '
+        f'at epoch {min_train_epoch}\n'
+        f'Lowest testing loss: {min_test_loss:.6f} '
+        f'at epoch {min_test_epoch}',
+        output_path
+    )
+
+    return history
+
+def plot_history(history, model_name):
+    ''' Save training/test loss and accuracy curves for a model '''
+    # Save loss and accuracy plots for the specified model
+    plots_dir = Path(__file__).resolve().parent.parent / 'plots'
+    plots_dir.mkdir(parents=True, exist_ok=True)
+
+    epochs = range(1, len(history['train_loss']) + 1)
+
+    # Plot training and testing loss
+    fig, ax = plt.subplots()
+
+    ax.plot(epochs, history['train_loss'], marker='o', label='Training')
+    ax.plot(epochs, history['test_loss'], marker='o', label='Test')
+
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Cross entropy loss')
+    ax.set_title(f'{model_name} Loss')
+    ax.legend()
+
+    fig.tight_layout()
+    fig.savefig(plots_dir / f'{model_name}_loss.png', dpi=150)
+    plt.close(fig)
+
+    # Plot training and testing accuracy
+    fig, ax = plt.subplots()
+
+    ax.plot(epochs, history['train_accuracy'], marker='o', label='Training')
+    ax.plot(epochs, history['test_accuracy'], marker='o', label='Test')
+
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Accuracy (%)')
+    ax.set_title(f'{model_name} Accuracy')
+    ax.legend()
+
+    fig.tight_layout()
+    fig.savefig(plots_dir / f'{model_name}_accuracy.png', dpi=150)
+    plt.close(fig)
 
 def main():
     '''
@@ -164,37 +304,29 @@ def main():
 
     print(f'Selected device: {device.type}')
 
-    # Initialize Conv3 and move parameters to the device
-    model = ConvNet3().to(device)
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(
-        params=model.parameters(),
-        lr=0.01,
-        momentum=0.9
-    )
+    for convnet in (ConvNet3, ConvNet4):
+        model = convnet().to(device)
+        # Initialize optimizer for model
+        optimizer = torch.optim.SGD(
+            params = model.parameters(),
+            lr=0.01,
+            momentum=0.9
+        )
 
-    print(f'Training ConvNet3 for 1 epoch on {device}', flush=True)
+        # Train the model
+        results = train_model_spec(
+            model=model,
+            criterion=criterion,
+            optimizer=optimizer,
+            device=device,
+            train_loader=train_loader,
+            test_loader=test_loader,
+            num_epochs=30
+        )
 
-    train_loss, train_accuracy = train(
-        model=model,
-        device=device,
-        train_loader=train_loader,
-        optimizer=optimizer,
-        criterion=criterion
-    )
-
-    print(f'\nTraining loss: {train_loss:.2f}')
-    print(f'Training accuracy: {train_accuracy:.2f}')
-
-    test_loss, test_accuracy = evaluate(
-        model=model,
-        device=device,
-        test_loader=test_loader,
-        criterion=criterion
-    )
-
-    print(f'Test loss: {test_loss:.2f}')
-    print(f'Test accuracy: {test_accuracy:.2f}')
+        # Plot results
+        plot_history(results, type(model).__name__)
 
 if __name__ == '__main__':
     main()
